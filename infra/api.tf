@@ -8,18 +8,27 @@ resource "aws_apigatewayv2_api" "api" {
   }
 }
 
-resource "aws_apigatewayv2_integration" "query" {
+locals {
+  routes = {
+    query     = "POST /query"
+    uploads   = "POST /uploads"
+    documents = "GET /documents/{doc_id}"
+  }
+}
+
+resource "aws_apigatewayv2_integration" "fn" {
+  for_each               = local.routes
   api_id                 = aws_apigatewayv2_api.api.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.query.invoke_arn
+  integration_uri        = local.route_functions[each.key].invoke_arn
   payload_format_version = "2.0"
 }
 
 resource "aws_apigatewayv2_route" "routes" {
-  for_each  = toset(["POST /query", "POST /uploads", "GET /documents/{doc_id}"])
+  for_each  = local.routes
   api_id    = aws_apigatewayv2_api.api.id
   route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.query.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.fn[each.key].id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {
