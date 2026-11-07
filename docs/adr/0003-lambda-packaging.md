@@ -25,5 +25,5 @@ Status: proposed. Issue: LorexGitHub/guarded-rag#11. Covers handoff decision #17
 
 ## Still open
 
-- Image size and Lambda cold start are unmeasured with Presidio and the spaCy model in the image (ADR 0001 flagged the same gap).
+- Image size is measured by #25: 924 MB with Presidio, the spaCy model and the OpenSearch client's dependencies (cold build 44 s). Lambda cold start is still unmeasured (ADR 0001 flagged the same gap).
 - Whether Floci re-pulls or re-uses a stale local image after a rebuild under the same tag is unchecked. Decision 3 assumes a digest or version tag forces it.

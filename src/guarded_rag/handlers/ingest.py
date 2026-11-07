@@ -6,7 +6,7 @@ from collections.abc import Callable
 from urllib.parse import unquote_plus
 
 from guarded_rag.handlers.deps import request_deps
-from guarded_rag.handlers.names import doc_id_for, is_allowed_filename, status_key
+from guarded_rag.handlers.names import UPLOAD_PREFIX, doc_id_for, is_allowed_filename, status_key
 from guarded_rag.handlers.objects import Objects, build_objects
 from guarded_rag.pipeline import Deps, ingest_document
 
@@ -32,7 +32,7 @@ def handler(
 
 
 def _ingest_record(obj: dict, objects: Objects, deps_factory: Callable[[], Deps]) -> None:
-    source = unquote_plus(obj["key"]).rsplit("/", 1)[-1]
+    source = unquote_plus(obj["key"]).removeprefix(UPLOAD_PREFIX)
     doc_id = doc_id_for(source)
     try:
         chunks = _ingest(obj["key"], obj["size"], source, doc_id, objects, deps_factory)
