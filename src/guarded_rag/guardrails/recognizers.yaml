@@ -1,0 +1,11 @@
+# Regex recognizers loaded into the registry (ADR 0009 decision 3).
+# A new entity needs an entry here and a seeded ground-truth value (ADR 0007).
+- entity_type: EMPLOYEE_ID
+  label: EMPLOYEE_ID
+  patterns:
+    - {name: employee_id, regex: '\bEMP-\d{5}\b', score: 0.85}
+# Presidio's own phone recognizer scores 0.4 (below the 0.5 cut) and rejects fake 555 numbers.
+- entity_type: PHONE_NUMBER
+  label: PHONE_NUMBER
+  patterns:
+    - {name: us_phone, regex: '(?<!\d)(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)', score: 0.6}

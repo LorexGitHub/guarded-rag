@@ -5,6 +5,9 @@ description = "A RAG app whose guardrail redacts PII, run locally on Floci"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1",
+    "en-core-web-md",
+    "presidio-analyzer>=2.2.366",
+    "pyyaml>=6.0.3",
 ]
 
 [dependency-groups]
@@ -35,3 +38,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.uv.sources]
+en-core-web-md = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" }
