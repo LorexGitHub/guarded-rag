@@ -3,7 +3,9 @@ name = "guarded-rag"
 version = "0.1.0"
 description = "A RAG app whose guardrail redacts PII, run locally on Floci"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+]
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
