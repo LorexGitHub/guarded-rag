@@ -55,21 +55,22 @@ class PresidioGuardrail:
 
     def _analyze(self, text: str) -> list:
         entities = self._registry.entities
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(
-                self._analyzer.analyze,
-                text=text,
-                language="en",
-                entities=entities,
-                score_threshold=SCORE_THRESHOLD,
-            )
-            try:
-                results = future.result(timeout=self._timeout)
-            except FutureTimeout as e:
-                pool.shutdown(wait=False, cancel_futures=True)
-                raise GuardrailError("redaction timed out") from e
-            except Exception as e:
-                raise GuardrailError("redaction failed") from e
+        pool = ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(
+            self._analyzer.analyze,
+            text=text,
+            language="en",
+            entities=entities,
+            score_threshold=SCORE_THRESHOLD,
+        )
+        try:
+            results = future.result(timeout=self._timeout)
+        except FutureTimeout as e:
+            raise GuardrailError("redaction timed out") from e
+        except Exception as e:
+            raise GuardrailError("redaction failed") from e
+        finally:
+            pool.shutdown(wait=False)
         return [r for r in results if r.entity_type in entities]
 
     def _placeholder(self, entity_type: str, value: str) -> str:
@@ -80,12 +81,12 @@ class PresidioGuardrail:
         return self._placeholders[key]
 
 
-def build_presidio_guardrail(registry: Registry | None = None) -> PresidioGuardrail:
+def build_presidio_guardrail() -> PresidioGuardrail:
     """Loads spaCy and the YAML recognizers. Slow: build once and call for_request() per request."""
     from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
     from presidio_analyzer.nlp_engine import NlpEngineProvider
 
-    registry = registry or load_registry()
+    registry = load_registry()
     nlp = NlpEngineProvider(
         nlp_configuration={
             "nlp_engine_name": "spacy",

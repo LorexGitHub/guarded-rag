@@ -1,4 +1,5 @@
 import threading
+import time
 
 import pytest
 from presidio_analyzer import RecognizerResult
@@ -86,6 +87,27 @@ class TestPlaceholders:
         assert r.text == "xx<EMPLOYEE_ID_1> y"
         assert [f.entity_type for f in r.findings] == ["EMPLOYEE_ID"]
 
+    @pytest.mark.parametrize(
+        ("spans", "expected"),
+        [
+            # touching spans do not overlap, so both stay
+            ([("PERSON", 0, 3, 0.9), ("EMAIL_ADDRESS", 3, 6, 0.9)], "<PERSON_1><EMAIL_ADDRESS_1>"),
+            ([("PERSON", 0, 3, 0.8), ("EMAIL_ADDRESS", 3, 6, 0.9)], "<PERSON_1><EMAIL_ADDRESS_1>"),
+            # the higher score wins even against a longer span
+            ([("PERSON", 0, 6, 0.6), ("EMAIL_ADDRESS", 2, 4, 0.9)], "ab<EMAIL_ADDRESS_1>ef"),
+            # equal scores: the longer span wins
+            ([("PERSON", 0, 6, 0.9), ("EMAIL_ADDRESS", 5, 6, 0.9)], "<PERSON_1>"),
+            # spans overlapping at the far edge are still one finding
+            ([("PERSON", 0, 4, 0.9), ("EMAIL_ADDRESS", 3, 6, 0.8)], "<PERSON_1>ef"),
+        ],
+    )
+    def test_overlap_rules(self, spans, expected):
+        class Fixed:
+            def analyze(self, **_):
+                return [RecognizerResult(k, s, e, sc) for k, s, e, sc in spans]
+
+        assert PresidioGuardrail(Fixed(), load_registry()).redact("abcdef").text == expected
+
     def test_only_registered_entities_are_requested_at_score_half(self):
         g = guardrail({})
         g.redact("x")
@@ -117,9 +139,11 @@ class TestFailsClosed:
     def test_a_timeout_raises_guardrail_error(self):
         slow = HangingAnalyzer()
         g = PresidioGuardrail(slow, load_registry(), timeout=0.05)
+        started = time.monotonic()
         try:
             with pytest.raises(GuardrailError, match="timed out"):
                 g.redact("Ann")
+            assert time.monotonic() - started < 1
         finally:
             slow.release.set()
 
@@ -142,9 +166,12 @@ class TestRegistry:
         assert "BADGE" in reg.entities
         assert reg.label("BADGE") == "BADGE"
 
-    def test_a_bad_entry_is_rejected_at_load(self, tmp_path):
+    @pytest.mark.parametrize(
+        "body", ["- entity_type: BADGE\n", "- entity_type: BADGE\n  patterns: []\n"]
+    )
+    def test_an_entry_without_patterns_is_rejected_at_load(self, tmp_path, body):
         f = tmp_path / "r.yaml"
-        f.write_text("- entity_type: BADGE\n  patterns: []\n")
+        f.write_text(body)
         with pytest.raises(ValueError, match="BADGE"):
             load_registry(f)
 

@@ -42,9 +42,8 @@ class Registry:
 
 def _parse_entity(raw: dict) -> YamlEntity:
     kind = raw.get("entity_type", "<missing entity_type>")
-    patterns = tuple(
-        Pattern(p["name"], p["regex"], float(p["score"])) for p in raw.get("patterns") or []
-    )
+    raw_patterns = raw.get("patterns") or []
+    patterns = tuple(Pattern(p["name"], p["regex"], float(p["score"])) for p in raw_patterns)
     if not patterns:
         raise ValueError(f"{kind}: needs at least one pattern")
     return YamlEntity(kind, raw.get("label", kind), patterns)
