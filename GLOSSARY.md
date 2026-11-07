@@ -12,7 +12,7 @@
 
 **Ingest status**: `pending`, `ready` or `failed` for one uploaded document, read from the marker the ingest handler writes after `replace_document`. See ADR 0006.
 
-**Seeded value**: a fake PII value (name, phone, email, `EMPLOYEE_ID`) the corpus generator planted in a document. Each one is recorded in `corpus/ground_truth.yaml`. See ADR 0006.
+**Seeded value**: a fake PII value (name, phone, email, `EMPLOYEE_ID`) the corpus generator planted in a document. Each one is recorded in `corpus/ground_truth.yaml`. See ADR 0007.
 
 **Ground truth manifest**: `corpus/ground_truth.yaml`, the list of every seeded value with its entity type, document and normalized form. The eval's leak check reads it.
 

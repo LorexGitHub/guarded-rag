@@ -1,4 +1,4 @@
-# 0006. Eval corpus and case format
+# 0007. Eval corpus and case format
 
 Status: proposed. Issue: LorexGitHub/guarded-rag#15. Builds on #7 (leak definition, placeholders), ADR 0004 (refusal, threshold) and ADR 0005 (seams, result shape).
 
