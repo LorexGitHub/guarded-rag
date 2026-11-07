@@ -1,0 +1,11 @@
+.git
+.venv
+.agents
+.claude
+.metrics
+prototype
+docs
+corpus
+spike
+tests
+**/__pycache__

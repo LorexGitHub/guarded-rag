@@ -28,6 +28,14 @@ services:
     entrypoint: ["true"]
     restart: "no"
     networks: [rag]
+  # Builds the one Lambda image all functions share. Floci finds it in the local Docker daemon
+  # by this tag; Terraform only references it (ADR 0003).
+  lambda-image:
+    build: {context: ., dockerfile: docker/lambda/Dockerfile}
+    image: guarded-rag-lambda:latest
+    entrypoint: ["true"]
+    restart: "no"
+    networks: [rag]
   floci:
     image: floci/floci:latest
     ports: ["4566:4566"]
@@ -41,6 +49,7 @@ services:
     depends_on:
       ollama: {condition: service_started}
       opensearch-image: {condition: service_completed_successfully}
+      lambda-image: {condition: service_completed_successfully}
     networks: [rag]
 volumes: {ollama: {}}
 networks:
