@@ -1,26 +1,11 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { Marked, StatusIcon } from "./shared";
+import { VariantB } from "./variants/B";
+import { VariantC } from "./variants/C";
+import { PrototypeSwitcher, useVariant } from "./switcher";
 import { initialDocs, scenarios } from "./fixtures";
 import type { Doc, Finding, Hit, QueryResponse } from "./types";
 import { MIN_SCORE } from "./types";
-
-const PLACEHOLDER = /(<[A-Z_]+_\d+>)/g;
-
-function Marked({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(PLACEHOLDER).map((part, i) =>
-        i % 2 ? <mark key={i}>{part}</mark> : <Fragment key={i}>{part}</Fragment>,
-      )}
-    </>
-  );
-}
-
-function StatusIcon({ status }: { status: Doc["status"] | "refused" }) {
-  const common = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.6, "aria-hidden": true } as const;
-  if (status === "ready") return <svg {...common}><path d="M3 8.5l3.2 3L13 4.5" /></svg>;
-  if (status === "failed" || status === "refused") return <svg {...common}><path d="M4 4l8 8M12 4l-8 8" /></svg>;
-  return <svg {...common} className="spin"><path d="M8 2a6 6 0 1 0 6 6" /></svg>;
-}
 
 function Ask({ onAsk, busy }: { onAsk: (id: string) => void; busy: boolean }) {
   const [id, setId] = useState(new URLSearchParams(location.search).get("fx") ?? scenarios[0].id);
@@ -188,7 +173,7 @@ function Documents() {
   );
 }
 
-export function App() {
+function VariantA() {
   const [res, setRes] = useState<QueryResponse | null>(null);
   const [busy, setBusy] = useState(false);
   function ask(id: string) {
@@ -211,6 +196,24 @@ export function App() {
         <Trace res={res} />
         <Documents />
       </main>
+    </>
+  );
+}
+
+const variants = [
+  { key: "A", name: "Workbench, three columns" },
+  { key: "B", name: "Ledger, one column" },
+  { key: "C", name: "Pipeline, stage inspector" },
+];
+
+export function App() {
+  const [v, setV] = useVariant(variants.map((x) => x.key));
+  return (
+    <>
+      {v === "A" && <VariantA />}
+      {v === "B" && <VariantB />}
+      {v === "C" && <VariantC />}
+      <PrototypeSwitcher variants={variants} current={v} onChange={setV} />
     </>
   );
 }

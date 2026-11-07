@@ -1,0 +1,39 @@
+.vB { --p: oklch(96.5% 0.006 245); --p2: oklch(92% 0.008 245); --ink: oklch(20% 0.03 255); --mute: oklch(46% 0.02 255); --live: oklch(50% 0.2 258); --fig: oklch(72% 0.15 75); --bad: oklch(50% 0.19 27);
+  min-height: 100vh; background: var(--p); color: var(--ink); font: 400 16px/1.55 "Chivo Mono", ui-monospace, monospace; padding: 0 16px 120px; }
+.vB-wrap { max-width: 760px; margin-inline: auto; }
+.vB-top { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 2px solid var(--ink); font-size: 14px; }
+.vB h2 { font: 500 14px/1 "Chivo Mono", monospace; color: var(--mute); margin: 0 0 12px; letter-spacing: 0; }
+.vB h3 { font: 500 15px/1.3 "Chivo Mono", monospace; margin: 0 0 8px; max-width: none; letter-spacing: 0; }
+.vB-docs ul { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.vB-docs li { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border: 2px solid var(--ink); font-size: 13px; background: var(--p); }
+.vB-docs small { color: var(--mute); }
+.vB-docs .is-pending { border-color: var(--live); color: var(--live); } .vB-docs .is-failed { border-color: var(--bad); color: var(--bad); }
+.vB-add { border: 0 !important; padding: 0 !important; }
+.vB-btn { min-height: 44px; padding: 0 16px; border: 2px solid var(--ink); background: var(--p); color: var(--ink); font: 500 14px/1 "Chivo Mono", monospace; cursor: pointer; transition: background-color 120ms; }
+.vB-btn:hover { background: var(--p2); } .vB-btn:focus-visible, .vB-pick button:focus-visible, .vB summary:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.vB-btn:disabled { opacity: .55; cursor: not-allowed; }
+.vB-go { background: var(--ink); color: var(--p); min-width: 110px; } .vB-go:hover { background: oklch(32% 0.03 255); }
+.vB-err { color: var(--bad); font-size: 13px; margin: 8px 0 0; }
+.vB-ask { margin-top: 48px; } .vB-ask label { display: block; font-size: 14px; color: var(--mute); margin-bottom: 8px; }
+.vB-line { display: flex; gap: 12px; align-items: baseline; border-bottom: 2px solid var(--ink); padding-bottom: 8px; font-size: 22px; line-height: 1.3; }
+.vB-line span { color: var(--live); } .vB-line textarea { resize: none; font-size: 20px; }
+.vB-line input, .vB-line textarea { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; color: var(--ink); }
+.vB-line textarea:focus-visible { outline: 2px solid var(--live); outline-offset: 4px; }
+.vB-row { display: flex; justify-content: space-between; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+.vB-pick { display: flex; gap: 0; border: 2px solid var(--ink); }
+.vB-pick button { min-height: 44px; padding: 0 14px; border: 0; background: transparent; font: 400 13px/1 "Chivo Mono", monospace; color: var(--ink); cursor: pointer; }
+.vB-pick button + button { border-left: 2px solid var(--ink); } .vB-pick [aria-checked="true"] { background: var(--ink); color: var(--p); }
+.vB-answer { margin-top: 48px; padding: 24px; background: var(--ink); color: var(--p); }
+.vB-answer h2 { color: var(--fig); } .vB-answer > p:first-of-type { font: 400 22px/1.4 "Chivo Mono", monospace; max-width: none; }
+.vB-answer.is-refused h2 { color: oklch(72% 0.17 27); } .vB-note { margin-top: 12px; font-size: 14px; color: oklch(75% 0.02 255); }
+.vB-src { margin: 20px 0 0; padding: 12px 0 0 20px; border-top: 1px solid oklch(40% 0.03 255); font-size: 14px; color: oklch(80% 0.02 255); }
+.vB mark { background: oklch(88% 0.06 258); color: var(--ink); padding: 0 4px; margin-right: 6px; font-size: .85em; }
+.vB-answer mark { background: oklch(36% 0.05 258); color: oklch(88% 0.1 75); }
+.vB-trace { margin-top: 48px; } .vB-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 28px; }
+.vB-steps > li { border-left: 2px solid var(--ink); padding-left: 20px; } .vB-steps p { max-width: none; font-size: 14px; }
+.vB table { width: 100%; border-collapse: collapse; font-size: 13px; } .vB th { text-align: left; font-weight: 500; color: var(--mute); padding: 6px 8px 6px 0; border-bottom: 2px solid var(--ink); }
+.vB td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--p2); vertical-align: top; } .vB .num { font-variant-numeric: tabular-nums; }
+.vB .bar { position: relative; width: 38%; } .vB .bar i { position: absolute; left: 0; top: 12px; height: 10px; background: var(--mute); } .vB .bar b { position: absolute; top: 6px; width: 2px; height: 22px; background: var(--ink); }
+.vB .pass { font-weight: 500; } .vB .pass .bar i { background: var(--live); } .vB .fail { color: var(--mute); }
+.vB summary { cursor: pointer; } .vB details p { margin: 6px 0 0; color: var(--ink); font-weight: 400; }
+.vB-steps p mark { display: inline-block; }
