@@ -1,0 +1,22 @@
+name: guarded-rag
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes: [ollama:/root/.ollama]
+    ports: ["11434:11434"]
+    networks: [rag]
+  floci:
+    image: floci/floci:latest
+    ports: ["4566:4566"]
+    environment:
+      FLOCI_SERVICES_DOCKER_NETWORK: guarded-rag
+      FLOCI_SERVICES_OPENSEARCH_DEFAULT_IMAGE: guarded-rag-opensearch:512m
+      FLOCI_SERVICES_BEDROCK_RUNTIME_BACKEND: proxy
+      FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_URL: http://ollama:11434/v1
+      FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_DEFAULT_MODEL: llama3.2:3b
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    depends_on: [ollama]
+    networks: [rag]
+volumes: {ollama: {}}
+networks:
+  rag: {name: guarded-rag}
