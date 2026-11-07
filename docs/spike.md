@@ -14,7 +14,7 @@ Issue: LorexGitHub/guarded-rag#4. Run on 2026-11-07, 16 GB host (Intel Iris Xe, 
 ## Files
 
 - `docker-compose.yml`: `ollama` and `floci` on the network `guarded-rag`.
-- `spike/opensearch/Dockerfile`: OpenSearch 2.19 with `OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m`.
+- `docker/opensearch/Dockerfile`: OpenSearch 2.19 with `OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m`.
 - `spike/run.sh`, `os.sh`, `os2.sh`, `os3.sh`: the exact scripts that produced the numbers.
 
 ## Commands
@@ -30,7 +30,7 @@ curl -s localhost:4566/model/anthropic.claude-3-haiku-20240307-v1:0/converse \
   -d '{"messages":[{"role":"user","content":[{"text":"Reply with exactly: pong"}]}],"inferenceConfig":{"maxTokens":20}}'
 
 # OpenSearch domain (Floci starts a real container, exposed on host port 9400)
-docker build -t guarded-rag-opensearch:512m spike/opensearch
+docker build -t guarded-rag-opensearch:512m docker/opensearch
 curl -s -X POST localhost:4566/2021-01-01/opensearch/domain -H 'content-type: application/json' \
   -d '{"DomainName":"rag","EngineVersion":"OpenSearch_2.19"}'
 ```

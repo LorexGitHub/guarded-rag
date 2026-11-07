@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 cd "$(dirname "$0")/.."
-docker build -q -t guarded-rag-opensearch:512m spike/opensearch
+docker build -q -t guarded-rag-opensearch:512m docker/opensearch
 curl -s -XDELETE localhost:4566/2021-01-01/opensearch/domain/rag >/dev/null; sleep 5
 docker compose up -d floci </dev/null 2>&1 | tail -1
 until curl -s localhost:4566 >/dev/null; do sleep 2; done

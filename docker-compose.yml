@@ -2,8 +2,30 @@ name: guarded-rag
 services:
   ollama:
     image: ollama/ollama:latest
+    environment:
+      # The default (5 min) unloads the model and slows the first request after idle (ADR 0001).
+      OLLAMA_KEEP_ALIVE: 24h
     volumes: [ollama:/root/.ollama]
     ports: ["11434:11434"]
+    networks: [rag]
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - until ollama list >/dev/null 2>&1; do sleep 1; done;
+        ollama pull llama3.2:3b && ollama pull nomic-embed-text
+    depends_on: [ollama]
+    restart: "no"
+    networks: [rag]
+  # Builds the 512 MB-heap image. Floci starts the real OpenSearch container from it when a
+  # domain is created, because Floci cannot set the heap itself (ADR 0001, docs/spike.md).
+  opensearch-image:
+    build: docker/opensearch
+    image: guarded-rag-opensearch:512m
+    entrypoint: ["true"]
+    restart: "no"
     networks: [rag]
   floci:
     image: floci/floci:latest
@@ -15,7 +37,9 @@ services:
       FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_URL: http://ollama:11434/v1
       FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_DEFAULT_MODEL: llama3.2:3b
     volumes: [/var/run/docker.sock:/var/run/docker.sock]
-    depends_on: [ollama]
+    depends_on:
+      ollama: {condition: service_started}
+      opensearch-image: {condition: service_completed_successfully}
     networks: [rag]
 volumes: {ollama: {}}
 networks:
