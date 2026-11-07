@@ -1,4 +1,4 @@
-# 0003. Vector store
+# 0004. Vector store
 
 Status: proposed. Issue: LorexGitHub/guarded-rag#10. Covers handoff decision #12. Builds on ADR 0001 and ADR 0002. Numbers come from `docs/spike.md` (issue #6).
 
