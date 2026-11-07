@@ -1,0 +1,51 @@
+# ADR 0008 decision 2: bring the stack up on a free runner and record peak memory and latency.
+name: measure
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/measure.sh
+      - .github/workflows/measure.yml
+      - docker-compose.yml
+      - docker/**
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OLLAMA_MODELS_DIR: ${{ github.workspace }}/.ollama
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Key the model cache on the pulled model names
+        id: models
+        run: |
+          names=$(grep -o 'ollama pull [^ ;&]*' docker-compose.yml | sort | tr '\n' ' ')
+          echo "key=$(echo "$names" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: .ollama
+          key: ollama-models-${{ steps.models.outputs.key }}
+
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the 512 MB OpenSearch image (layers cached in gha)
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/opensearch
+          load: true
+          tags: guarded-rag-opensearch:512m
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Measure
+        run: scripts/measure.sh | tee measure.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Make the model cache readable by the runner user
+        if: always()
+        run: sudo chmod -R a+rX .ollama || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: measure
+          path: measure.md

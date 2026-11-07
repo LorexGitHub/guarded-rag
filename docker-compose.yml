@@ -5,7 +5,8 @@ services:
     environment:
       # The default (5 min) unloads the model and slows the first request after idle (ADR 0001).
       OLLAMA_KEEP_ALIVE: 24h
-    volumes: [ollama:/root/.ollama]
+    # CI points OLLAMA_MODELS_DIR at a cached directory (ADR 0008); locally it is the named volume.
+    volumes: ["${OLLAMA_MODELS_DIR:-ollama}:/root/.ollama"]
     ports: ["11434:11434"]
     networks: [rag]
   ollama-pull:

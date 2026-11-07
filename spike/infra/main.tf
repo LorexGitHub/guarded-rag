@@ -18,11 +18,11 @@ provider "aws" {
   skip_requesting_account_id  = true
   s3_use_path_style           = true
   endpoints {
-    s3  = "http://localhost:4566"
+    s3     = "http://localhost:4566"
     lambda = "http://localhost:4566"
-    iam = "http://localhost:4566"
-    sts = "http://localhost:4566"
-    logs = "http://localhost:4566"
+    iam    = "http://localhost:4566"
+    sts    = "http://localhost:4566"
+    logs   = "http://localhost:4566"
   }
 }
 
@@ -31,7 +31,7 @@ resource "aws_s3_bucket" "docs" { bucket = "spike-docs" }
 resource "aws_iam_role" "probe" {
   name = "spike-probe"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "lambda.amazonaws.com" } }]
   })
 }
