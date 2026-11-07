@@ -71,6 +71,85 @@ Measured with `docker stats --no-stream` (container RSS) and `free -m`. The host
 4. `docker compose exec` reads stdin. Inside a heredoc or script it swallows the remaining lines, so use `-T` and `</dev/null`.
 5. The aws CLI isn't installed, so calls used raw `curl` against Floci's REST routes.
 
-## Not covered (still open from the handoff checklist)
+## Lambda: container image, S3 trigger, network reach
 
-S3 to Lambda trigger, container-image Lambda, and Lambda-to-Ollama/OpenSearch reachability. This issue only covered the Compose stack, converse proxy and memory.
+Issue: LorexGitHub/guarded-rag#5. Run on 2026-11-07, Floci latest, Terraform 1.17.1, `hashicorp/aws` 6.x.
+
+### Result
+
+| Question | Answer |
+|---|---|
+| Terraform deploys a **container-image** Lambda (`package_type = "Image"`) on Floci | Yes. Creation took 5 s. |
+| An S3 put triggers it (`aws_s3_bucket_notification` + `aws_lambda_permission`) | Yes. The Lambda ran about 1 s after the PUT, with a real S3 event record. |
+| Lambda container resolves `ollama` by name | Yes (`172.21.0.2`) |
+| Lambda container calls Ollama (`GET http://ollama:11434/api/tags`) | Yes, 200, lists both models |
+| Lambda container calls OpenSearch (`GET <domain endpoint>`) | Yes, 200, OpenSearch 2.19.0 |
+| Zip + layer fallback needed | **No.** It was not tried, so there is nothing to record. |
+
+### Files
+
+- `spike/lambda/{Dockerfile,handler.py}`: base `public.ecr.aws/lambda/python:3.12`. The handler resolves the Ollama host, then calls Ollama and OpenSearch and prints a `PROBE {...}` line.
+- `spike/infra/main.tf`: S3 bucket, IAM role, image Lambda, permission, bucket notification. Provider endpoints point at Floci.
+
+### Commands
+
+```bash
+docker build -t guarded-rag-spike-probe:latest spike/lambda
+# domain "rag" must exist (see above); take its Endpoint from DescribeDomain
+terraform -chdir=spike/infra init
+terraform -chdir=spike/infra apply -auto-approve -var opensearch_url=http://172.21.0.4:9200
+curl -X PUT localhost:4566/spike-docs/hello.txt -d hello       # unsigned PUT is accepted
+docker logs guarded-rag-floci-1 2>&1 | grep PROBE              # Lambda output appears in Floci's log
+```
+
+### Gotchas
+
+1. **`image_uri` can be a local image.** Floci logs `Image already present locally, skipping pull` and uses the host Docker daemon through the mounted socket. There was no ECR push. Floci also has an `ecr` service, but this spike did not test it. For the real build, `docker build -t <name>` before `terraform apply` is enough.
+2. **Lambda containers join the `guarded-rag` network** because of `FLOCI_SERVICES_DOCKER_NETWORK`, which is why `ollama` resolves by name. Without it they would not.
+3. **The OpenSearch endpoint is a container IP** (`172.21.0.4:9200`) and can change when the domain is recreated. Pass it to the Lambda from the Terraform domain output, or look it up at run time. Do not hard-code it. The spike hard-coded it through a variable. The Terraform OpenSearch resource was not used here (the domain came from the earlier curl).
+4. **The Lambda container starts on first invocation** and stays up (`floci-aws-spike-probe-<id>`). The first S3-triggered run was cold, with no measured cold-start time.
+5. **Lambda stdout goes to Floci's container log**, as well as CloudWatch Logs. This is handy for debugging.
+6. The probe image is the bare Lambda base image plus one file (518 MB on disk; the probe container used 14 MiB of its 128 MiB). The Presidio + spaCy image size and memory are still unmeasured. That is the next risk to test.
+
+## Not covered
+
+API Gateway, a Presidio/spaCy image, and `aws_opensearch_domain` in Terraform.
+
+---
+
+# Spike: OpenSearch k-NN on Floci (Terraform)
+
+Issue: LorexGitHub/guarded-rag#6. Run on 2026-11-07 on the same host and stack as above (Floci + Ollama under Compose, 512 MB heap image).
+
+## Result
+
+| Question | Answer |
+|---|---|
+| Create an OpenSearch domain on Floci with Terraform | **Yes**, with `hashicorp/aws ~> 5.0` (5.100.0). But `apply` took **10 min** (see gotcha 1). |
+| Index with a 768-dim `knn_vector` mapping | Yes (`hnsw`, `lucene` engine, `cosinesimil`) |
+| Index vectors and run a top-k query | Yes. 5 random 768-dim vectors, k=3. A query near doc 2 returned doc 2 first (score 0.999), then 1 and 4. |
+| Latency | Server `took`: 2 ms. Client round trip (host to container, Python urllib): median 7.6 ms, min 6.3 ms, max 30.7 ms over 20 queries. Tiny index, so this says nothing about scale. |
+| Memory | OpenSearch container 990 MiB with the 512 MB heap (`heap_max_in_bytes` = 536870912) after indexing. Floci 66 MiB. Ollama 14 MiB idle (no model loaded). |
+
+## Files
+
+- `spike/terraform/main.tf`: AWS provider with the `opensearch` endpoint set to `http://localhost:4566`, plus one `aws_opensearch_domain`.
+- `spike/knn.sh`: creates the index, indexes 5 vectors, runs 20 top-3 queries and prints latency.
+
+```bash
+cd spike/terraform && terraform init && terraform apply -auto-approve   # ~10 min
+cd .. && ./knn.sh
+```
+
+Terraform cannot create the index. The AWS provider has no resource for it, so the index step is plain HTTP against the domain (host port 9400). An `opensearch-project/opensearch` Terraform provider could do it declaratively. It was not tried.
+
+## Gotchas
+
+1. **`terraform apply` hangs about 10 minutes even though the domain is ready within about a minute.** `DescribeDomain` already reports `Processing: false` and port 9400 answers, yet the provider keeps showing "Still creating..." until 10m01s, then succeeds. A first run with `timeout 500` was killed at 500 s and left an empty `terraform.tfstate` and a live domain behind. Cause not isolated. Likely suspect: the provider waits for something Floci reports differently from AWS, for example `Endpoint` is `http://172.21.0.4:9200` (an `http://` URL with a container IP) where AWS returns a hostname. Do not apply with a timeout under 15 min until this is understood.
+2. The domain `Endpoint` is a container IP, reachable only from the `guarded-rag` network or via the published host port 9400 (not via Terraform's `endpoint` output from the host).
+3. `terraform` was installed through mise. The Docker socket needs the `docker` group, which a long-running shell may lack. `newgrp docker` worked.
+4. Deleting the domain through the Floci API and recreating it works; Terraform state must be removed by hand if the apply was killed.
+
+## Verdict
+
+OpenSearch k-NN with 768-dim vectors works on Floci at about 1 GiB for the container. The only failure is slow Terraform creation (10 min), not the k-NN itself.
