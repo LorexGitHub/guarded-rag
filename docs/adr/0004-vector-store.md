@@ -29,13 +29,16 @@ Status: proposed. Issue: LorexGitHub/guarded-rag#10. Covers handoff decision #12
 
 ## Triggers to revisit
 
-- The Terraform hang below can't be explained within a time-boxed attempt: replace `aws_opensearch_domain` with a script that creates the domain through Floci's REST API and polls until ready. Record the switch here.
+- The `timeouts { create }` workaround for the Terraform apply delay (below) stops working, for example after a move to provider v6 or if domains start taking longer than the timeout: replace `aws_opensearch_domain` with a script that creates the domain through Floci's REST API and polls until ready. Record the switch here.
 - Eval shows answerable questions refused or unanswerable ones answered: recalibrate the threshold (below) before touching k or the embedder.
 - Embedder or dimension changes (ADR 0002): reindex. The dimension assertion fails loudly until then.
 - Corpus grows past what 5 chunks of context can serve: raise k and check the `llama3.2:3b` context budget first.
 
+## Terraform apply delay (resolved, #14)
+
+`terraform apply` on `aws_opensearch_domain` took about 10 min although the domain was ready in about a minute. Cause: the `hashicorp/aws` provider's `waitForDomainCreation` calls `tfresource.Retry(..., WithDelay(10*time.Minute), WithPollInterval(10*time.Second))`, a fixed wait before the first poll. It is the same in v5.0.0, v5.100.0, v6.0.0 and `main`, and does not depend on Floci's `Endpoint` or `Processing` values. Workaround: `timeouts { create = "3m" }` on the domain. The timeout ends the wait during the fixed delay and v5.x then makes one last `DescribeDomain` check, which succeeds if the domain is ready. Measured: apply in 1m31s with a 90s timeout. Keep the provider on `~> 5.0` (`main` dropped that final check). The timeout must exceed the domain's real startup time (about 1 min locally).
+
 ## Still open
 
-- **Terraform hang.** `terraform apply` takes about 10 min on `aws_opensearch_domain` although the domain is ready in about a minute (spike gotcha 1). Cause not isolated. Suspect: Floci reports `Endpoint` as `http://172.x.x.x:9200`, where AWS returns a hostname. Do not apply with a timeout under 15 min until this is understood. Time-box the investigation.
 - **Threshold calibration.** 0.70 is a guess, not measured on nomic's score distribution. When the eval corpus exists, set it to the highest value that keeps recall on answerable questions while refusing unanswerable ones, then drop "provisional" from this ADR.
 - The OpenSearch endpoint is a container IP that changes when the domain is recreated. Pass it to the Lambdas from the Terraform output, or look it up at run time.

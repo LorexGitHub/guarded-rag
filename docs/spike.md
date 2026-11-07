@@ -137,7 +137,7 @@ Issue: LorexGitHub/guarded-rag#6. Run on 2026-11-07 on the same host and stack a
 - `spike/knn.sh`: creates the index, indexes 5 vectors, runs 20 top-3 queries and prints latency.
 
 ```bash
-cd spike/terraform && terraform init && terraform apply -auto-approve   # ~10 min
+cd spike/terraform && terraform init && terraform apply -auto-approve   # ~1.5 min with the create timeout
 cd .. && ./knn.sh
 ```
 
@@ -145,7 +145,7 @@ Terraform cannot create the index. The AWS provider has no resource for it, so t
 
 ## Gotchas
 
-1. **`terraform apply` hangs about 10 minutes even though the domain is ready within about a minute.** `DescribeDomain` already reports `Processing: false` and port 9400 answers, yet the provider keeps showing "Still creating..." until 10m01s, then succeeds. A first run with `timeout 500` was killed at 500 s and left an empty `terraform.tfstate` and a live domain behind. Cause not isolated. Likely suspect: the provider waits for something Floci reports differently from AWS, for example `Endpoint` is `http://172.21.0.4:9200` (an `http://` URL with a container IP) where AWS returns a hostname. Do not apply with a timeout under 15 min until this is understood.
+1. **`terraform apply` took about 10 minutes even though the domain is ready within about a minute.** Cause (#14): the provider's `waitForDomainCreation` has a hard-coded `WithDelay(10*time.Minute)` before the first poll, in every provider version checked (v5.0.0 to `main`). It is not caused by Floci's `Endpoint`. Workaround: `timeouts { create = "3m" }` on the domain with the provider on v5.x; the timeout ends the wait and v5.x then does a final `DescribeDomain` check. Tested with a 90s timeout: apply took 1m31s. See ADR 0004. A first run killed at 500 s left an empty `terraform.tfstate` and a live domain behind.
 2. The domain `Endpoint` is a container IP, reachable only from the `guarded-rag` network or via the published host port 9400 (not via Terraform's `endpoint` output from the host).
 3. `terraform` was installed through mise. The Docker socket needs the `docker` group, which a long-running shell may lack. `newgrp docker` worked.
 4. Deleting the domain through the Floci API and recreating it works; Terraform state must be removed by hand if the apply was killed.

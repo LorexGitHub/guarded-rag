@@ -23,6 +23,10 @@ resource "aws_opensearch_domain" "rag" {
     instance_type  = "t3.small.search"
     instance_count = 1
   }
+  # The aws provider waits a fixed 10 min before its first poll. A short create
+  # timeout ends that wait and v5.x then checks once more. Needs provider v5.x; see ADR 0004.
+  timeouts { create = "3m" }
+
   ebs_options {
     ebs_enabled = true
     volume_size = 10
