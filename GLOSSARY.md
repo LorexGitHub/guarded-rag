@@ -7,3 +7,7 @@
 **Hit**: one retrieved chunk with its score and whether it passed the score threshold.
 
 **Refusal**: the fixed answer returned, without calling the `LLM`, when no hit passes the threshold (ADR 0004).
+
+**Trace**: the part of a query response that shows the guardrail at work: all top-k hits (redacted text, score, `passed`) and the findings in the question and in the answer. Findings carry no spans. See ADR 0006.
+
+**Ingest status**: `pending`, `ready` or `failed` for one uploaded document, read from the marker the ingest handler writes after `replace_document`. See ADR 0006.

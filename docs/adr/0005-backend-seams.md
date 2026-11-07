@@ -62,4 +62,4 @@ Hand-written in `tests/fakes.py`, with no mock library:
 
 ## Still open
 
-- `Finding` spans refer to the original text, so they are not meaningful to the UI once the text is redacted. Check what the trace panel needs when the UI is built.
+- `Finding` spans refer to the original text, so they are not meaningful to the UI once the text is redacted. Resolved in ADR 0006: the API trace carries `entity_type` and `placeholder` only, no spans.
