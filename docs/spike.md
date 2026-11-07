@@ -153,3 +153,30 @@ Terraform cannot create the index. The AWS provider has no resource for it, so t
 ## Verdict
 
 OpenSearch k-NN with 768-dim vectors works on Floci at about 1 GiB for the container. The only failure is slow Terraform creation (10 min), not the k-NN itself.
+
+---
+
+# Spike: stack measurement on a free GitHub runner
+
+Issue: LorexGitHub/guarded-rag#28 (ADR 0008 decision 2). Workflow `measure.yml`, run [42349883408](https://github.com/LorexGitHub/guarded-rag/actions/runs/42349883408) on 2026-11-07. `scripts/measure.sh` brings up Floci, Ollama and the 512 MB OpenSearch image, creates the domain, then times five calls.
+
+The repo is now public, so `ubuntu-latest` is **4 vCPU / 16 GB**, not the 2 vCPU / 7 GB that ADR 0008 assumed for a private repo.
+
+| Metric | Value |
+|---|---|
+| Peak container memory (sum of `docker stats`) | 3705 MiB |
+| Peak host memory used | 4662 MiB |
+| Model pull, first run (cold cache) | 12.8 s |
+| OpenSearch domain ready | 14.4 s |
+
+| Case | Latency |
+|---|---|
+| generate, cold (model load), `llama3.2:3b` | 4.35 s |
+| generate, warm 1 | 5.01 s |
+| generate, warm 2 | 14.64 s |
+| generate, warm 3 | 14.22 s |
+| embed, `nomic-embed-text` | 0.30 s |
+
+- Peak host memory of 4.7 GiB is under the ~6 GiB trigger in ADR 0008, with room left for Lambda containers (not measured here; the Presidio + spaCy image is still unknown).
+- Generation latency depends on answer length (160 max tokens). Warm calls took 5 to 15 s. A 30-case eval is therefore roughly 3 to 8 minutes of generation, under the ~10 minute trigger. This is an estimate, not a full eval run.
+- Not measured: the cache-hit path and the `qwen2.5:1.5b` fallback. The Lambda image-layer cache has nothing to cache yet; the `type=gha` cache covers the OpenSearch image only.
