@@ -10,6 +10,8 @@ locals {
     OLLAMA_URL     = var.ollama_url
     UPLOAD_BUCKET  = aws_s3_bucket.docs.bucket
     ALLOWED_ORIGIN = var.cors_origin
+    # Presigned URLs are used by the browser, which reaches Floci on the host port.
+    S3_PUBLIC_ENDPOINT = var.s3_public_endpoint
   }
 }
 

@@ -180,3 +180,15 @@ The repo is now public, so `ubuntu-latest` is **4 vCPU / 16 GB**, not the 2 vCPU
 - Peak host memory of 4.7 GiB is under the ~6 GiB trigger in ADR 0008, with room left for Lambda containers (not measured here; the Presidio + spaCy image is still unknown).
 - Generation latency depends on answer length (160 max tokens). Warm calls took 5 to 15 s. A 30-case eval is therefore roughly 3 to 8 minutes of generation, under the ~10 minute trigger. This is an estimate, not a full eval run.
 - Not measured: the cache-hit path and the `qwen2.5:1.5b` fallback. The Lambda image-layer cache has nothing to cache yet; the `type=gha` cache covers the OpenSearch image only.
+
+---
+
+# Thin end-to-end slice: `make up` and the API e2e test
+
+Issue: LorexGitHub/guarded-rag#27 (ADR 0008 decision 1). Run on 2026-11-07, Floci latest, Terraform 1.17.1, `hashicorp/aws` 5.x.
+
+- `make up` from a clean state (no containers, Ollama volume kept) took **3m35s** with images already built: Compose, both model pulls (cached), `terraform apply` (24 resources). `make down` removes the Compose stack, Floci's spawned OpenSearch and Lambda containers and volumes, and the Terraform state.
+- **Floci serves HTTP APIs at `http://localhost:4566/restapis/{api_id}/$default/_user_request_`.** The `{api_id}.execute-api.localhost:4566` host is not routed (it is treated as an S3 bucket name). Terraform exposes the working URL as the `api_url` output.
+- **CORS preflight passes on Floci.** `OPTIONS /query` from the configured origin returns 204 with `Access-Control-Allow-Origin`, `-Methods: POST,GET` and `-Headers: content-type`. From any other origin the `Access-Control-Allow-Origin` header is absent. The S3 bucket CORS rule for `PUT` also answers a preflight. ADR 0006 decision 8 stands.
+- Presigned PUT URLs need a host the caller can reach: the Lambda sets `S3_PUBLIC_ENDPOINT` (`http://localhost:4566`) for signing, while it reads S3 through Floci's in-network endpoint.
+- Observed, outside this ticket: for "Who is the HR contact ... email", the answer redacted the email (`<EMAIL_ADDRESS_1>`) but left the person's name (`Grace Park`) in place. The e2e test asserts on seeded emails only.

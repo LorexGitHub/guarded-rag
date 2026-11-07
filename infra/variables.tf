@@ -24,3 +24,9 @@ variable "ingest_memory_size" {
   type    = number
   default = 1024
 }
+
+variable "s3_public_endpoint" {
+  type        = string
+  default     = "http://localhost:4566"
+  description = "Host the browser uses to reach S3, put into presigned URLs. The Lambda's own endpoint is in-network."
+}

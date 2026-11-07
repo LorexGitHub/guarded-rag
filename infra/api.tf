@@ -39,3 +39,6 @@ resource "aws_apigatewayv2_stage" "default" {
 
 output "api_id" { value = aws_apigatewayv2_api.api.id }
 output "opensearch_endpoint" { value = aws_opensearch_domain.rag.endpoint }
+
+# Floci serves HTTP APIs under this path (the AWS execute-api hostname is not routed locally).
+output "api_url" { value = "http://localhost:4566/restapis/${aws_apigatewayv2_api.api.id}/$default/_user_request_" }
