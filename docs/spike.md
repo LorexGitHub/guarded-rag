@@ -113,7 +113,7 @@ docker logs guarded-rag-floci-1 2>&1 | grep PROBE              # Lambda output a
 
 ## Not covered
 
-API Gateway, a Presidio/spaCy image, and `aws_opensearch_domain` in Terraform.
+`aws_opensearch_domain` in Terraform. (API Gateway and the Presidio/spaCy image are covered in the next section.)
 
 ---
 
@@ -153,3 +153,79 @@ Terraform cannot create the index. The AWS provider has no resource for it, so t
 ## Verdict
 
 OpenSearch k-NN with 768-dim vectors works on Floci at about 1 GiB for the container. The only failure is slow Terraform creation (10 min), not the k-NN itself.
+
+
+---
+
+# Spike: API Gateway to an image Lambda, and the Presidio/spaCy image
+
+Issue: LorexGitHub/guarded-rag#13. Run on 2026-11-07, same host and Compose stack, Floci latest, Terraform `hashicorp/aws` 6.x.
+
+## Result
+
+| Question | Answer |
+|---|---|
+| API Gateway **v2 HTTP API** to a container-image Lambda on Floci via Terraform | **Yes.** Apply took about 6 s. v1 was not needed. |
+| `curl` from the host | Yes: `POST http://localhost:4566/_aws/execute-api/<api_id>/$default/redact` |
+| CORS preflight (`OPTIONS`) from a browser origin | Yes. `cors_configuration` is honoured: `Access-Control-Allow-Origin/Methods/Headers` returned for the allowed origin. |
+| CORS on the real `POST` response | Yes, `Access-Control-Allow-Origin` is present |
+| Disallowed origin | `204` with no `Access-Control-*` headers, so a browser blocks it |
+| Presidio + spaCy `en_core_web_md` image works | Yes. Detects PERSON, PHONE_NUMBER, EMAIL_ADDRESS. |
+
+## Numbers
+
+Image `guarded-rag-presidio:latest` (base `public.ecr.aws/lambda/python:3.12`, `presidio-analyzer`, `presidio-anonymizer`, `en_core_web_md`):
+
+| Metric | Value |
+|---|---|
+| Image size on disk | **985 MB** (the bare base image is 518 MB, so Presidio + spaCy add about 470 MB) |
+| Build time, cold cache | 53 s |
+| Module init (import + load spaCy model) | 1.7 to 2.1 s |
+| First request through API Gateway (container start + init + first `redact`) | **2.4 to 3.4 s** (image already present locally, so no pull) |
+| First `redact` call alone | 0.33 to 0.8 s (spaCy warm-up) |
+| Warm `redact`, one sentence | **about 6 to 7 ms** (about 10 ms through API Gateway) |
+| Warm `redact`, about 4 KB text (60 repeated sentences) | 125 to 140 ms |
+| RSS after init | **about 290 to 400 MB** (varies with the container's limit) |
+| `docker stats` of the container once warm | 344 MiB |
+
+## Smallest `memory_size`
+
+| `memory_size` | Result |
+|---|---|
+| 128 (Floci default) | **Fails.** The runtime process is OOM-killed (exit 137) and API Gateway returns `500`. |
+| 256 | Works, but with no headroom: `docker stats` read 255.9 / 256 MiB. Warm requests and a 4 KB input still succeeded. |
+| **384** | Works, 344 / 384 MiB. **Smallest comfortable size.** |
+| 512, 768, 1024 | Work. Cold and warm timings are the same as 384. |
+
+Recommendation: **512 MB** for the query Lambda, which leaves room for the OpenSearch client and larger inputs. 256 is the hard floor. The ADR 0001 guess of 0.5 to 1 GiB per Lambda container holds at the low end.
+
+## Files
+
+- `spike/presidio/{Dockerfile,handler.py}`: the image. The analyzer is built at module level, so init cost lands on the cold start. The handler reads the v2 proxy event (`event["body"]`) and returns `{statusCode, headers, body}`.
+- `spike/apigw/main.tf`: Lambda, HTTP API, `AWS_PROXY` integration (payload 2.0), `POST /redact` route, `$default` stage with `auto_deploy`, Lambda permission. `memory_size` is a variable.
+
+```bash
+docker build -t guarded-rag-presidio:latest spike/presidio
+terraform -chdir=spike/apigw init
+terraform -chdir=spike/apigw apply -auto-approve -var memory_size=512
+ID=$(terraform -chdir=spike/apigw output -raw api_id)
+curl -X POST "http://localhost:4566/_aws/execute-api/$ID/\$default/redact" \
+  -H 'content-type: application/json' -H 'Origin: http://localhost:5173' \
+  -d '{"text":"Hi, I am John Smith, call 212-555-0198 or john@example.com"}'
+```
+
+## Gotchas
+
+1. **The invoke URL is a path, not a hostname.** Floci serves `/_aws/execute-api/<api_id>/<stage>/<route>`. Quote `$default` in the shell. The `<api_id>` changes on every recreate, so read it from `terraform output`.
+2. **A 128 MB function does not fail clearly.** The only symptom at the client is `{"message":"Internal Server Error"}`. The cause (`status 137`, "Lambda runtime process ... exited unexpectedly") shows only in Floci's log. Check `docker logs guarded-rag-floci-1` first.
+3. **A handler exception is also a plain `500`.** A bad request body raised `JSONDecodeError` inside the Lambda, with the traceback again visible only in Floci's log. The real handler should catch bad input and return a `400`.
+4. **`memory_size` changes recreate the warm container.** The next request is a cold start again, so measure cold start right after an `apply`.
+5. **Cold start here excludes an image pull.** Floci uses the local Docker image. A real ECR pull of 985 MB would add time that this spike cannot measure.
+6. **Presidio logs a `PlPeselRecognizer ... language is not supported` warning** at init for every non-English recognizer. It is harmless. Not investigated further.
+7. **`Access-Control-Max-Age` comes back as `0`** because the spike set no `max_age`. Set one in `cors_configuration` if preflight volume matters; whether Floci honours it was not tested.
+8. **No real browser was used.** CORS was checked with `curl` and the `Origin` and `Access-Control-Request-*` headers, which matches what a browser sends.
+
+## Still open
+
+- Whether a different spaCy model (`en_core_web_sm`, about 12 MB against `md`'s about 40 MB) would cut memory and cold start enough to matter. Not tried.
+- ADR 0003 "Still open" items: Floci re-pulling a stale image after a rebuild under the same tag is still unchecked. The `memory_size` change above did redeploy the function, but the image was not rebuilt.
